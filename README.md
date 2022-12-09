@@ -1,2 +1,1 @@
-# pubsub-test
-Testing of pub/sub
+# Testing of `libp2p` pub/sub features
