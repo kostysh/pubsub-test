@@ -1,31 +1,35 @@
 import { createLibp2p, Libp2pOptions } from 'libp2p';
-import { bootstrap } from '@libp2p/bootstrap';
 import { tcp } from '@libp2p/tcp';
 import { noise } from '@chainsafe/libp2p-noise';
 import { mplex } from '@libp2p/mplex';
 import { gossipsub } from '@chainsafe/libp2p-gossipsub';
+import wrtc from '@koush/wrtc';
+import { webRTCStar } from '@libp2p/webrtc-star';
+import { webSockets } from '@libp2p/websockets';
 
 export const decodeText = (buffer: BufferSource) =>
   new TextDecoder().decode(buffer);
 
 export const topic = 'wt_test_pubsub/v1';
 
+export const webRtc = webRTCStar({ wrtc });
+
 export const options: Libp2pOptions = {
-  transports: [tcp()],
+  addresses: {
+    listen: [
+      '/dns4/wrtc-star1.par.dwebops.pub/tcp/443/wss/p2p-webrtc-star',
+      '/dns4/wrtc-star2.sjc.dwebops.pub/tcp/443/wss/p2p-webrtc-star',
+    ]
+  },
+  transports: [webRtc.transport, webSockets(), tcp()],
   streamMuxers: [mplex()],
   connectionEncryption: [noise()],
   peerDiscovery: [
-    bootstrap({
-      list: [
-        '/ip4/104.131.131.82/tcp/4001/ipfs/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ',
-      ],
-      timeout: 1000,
-      tagName: 'bootstrap',
-      tagValue: 50,
-      tagTTL: 120000,
-    }),
+    webRtc.discovery,
   ],
-  pubsub: gossipsub(),
+  pubsub: gossipsub({
+    allowPublishToZeroPeers: true,
+  }),
 };
 
 export const main = async (): Promise<void> => {
@@ -43,7 +47,20 @@ export const main = async (): Promise<void> => {
   });
 
   libp2p.addEventListener('peer:discovery', ({ detail }) => {
-    console.log('Peer:', detail.id.toString());
+    // console.log('Peer:', detail.id.toString());
+    libp2p.dial(detail.id).catch(err => {
+      // console.log(`Could not dial ${detail.id}`, err);
+    });
+  });
+
+  libp2p.connectionManager.addEventListener('peer:connect', async ({ detail }) => {
+    // const id = detail.id.toString();
+    // console.log('Peer connected:', id);
+  });
+
+  libp2p.connectionManager.addEventListener('peer:disconnect', async ({ detail }) => {
+    // const id = detail.id.toString();
+    // console.log('Peer disconnected:', id);
   });
 
   libp2p.pubsub.addEventListener('message', ({ detail }) => {

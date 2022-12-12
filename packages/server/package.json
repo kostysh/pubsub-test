@@ -32,6 +32,9 @@
     "@chainsafe/libp2p-noise": "^10.2.0",
     "@chainsafe/libp2p-gossipsub": "^5.3.0",
     "@libp2p/bootstrap": "^5.0.1",
+    "@koush/wrtc": "^0.5.3",
+    "@libp2p/webrtc-star": "^5.0.3",
+    "@libp2p/websockets": "^5.0.1",
     "ts-node": "^10.9.1"
   }
 }

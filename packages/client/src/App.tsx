@@ -1,10 +1,11 @@
 import { useState, useCallback, useEffect } from 'react';
 import { createLibp2p, Libp2pOptions, Libp2p } from 'libp2p';
-import { bootstrap } from '@libp2p/bootstrap';
-import { webSockets } from '@libp2p/websockets';
 import { noise } from '@chainsafe/libp2p-noise';
 import { mplex } from '@libp2p/mplex';
 import { gossipsub } from '@chainsafe/libp2p-gossipsub';
+import wrtc from 'wrtc';
+import { webRTCStar } from '@libp2p/webrtc-star';
+import { webSockets } from '@libp2p/websockets';
 
 export const encodeText = (test: string) =>
   new TextEncoder().encode(test);
@@ -14,22 +15,24 @@ export const decodeText = (buffer: BufferSource) =>
 
 export const topic = 'wt_test_pubsub/v1';
 
+export const webRtc = webRTCStar({ wrtc });
+
 export const options: Libp2pOptions = {
-  transports: [webSockets()],
+  addresses: {
+    listen: [
+      '/dns4/wrtc-star1.par.dwebops.pub/tcp/443/wss/p2p-webrtc-star',
+      '/dns4/wrtc-star2.sjc.dwebops.pub/tcp/443/wss/p2p-webrtc-star',
+    ]
+  },
+  transports: [webRtc.transport, webSockets()],
   streamMuxers: [mplex()],
   connectionEncryption: [noise()],
   peerDiscovery: [
-    bootstrap({
-      list: [
-        '/ip4/104.131.131.82/tcp/443/wss/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ',
-      ],
-      timeout: 1000,
-      tagName: 'bootstrap',
-      tagValue: 50,
-      tagTTL: 120000,
-    }),
+    webRtc.discovery,
   ],
-  pubsub: gossipsub(),
+  pubsub: gossipsub({
+    allowPublishToZeroPeers: true,
+  }),
 };
 
 export const App = () => {
@@ -37,6 +40,7 @@ export const App = () => {
   const [subscribed, setSubscribed] = useState<boolean>(false);
   const [broadcasting, setBroadcasting] = useState<boolean>(false);
   const [lib, setLib] = useState<Libp2p | undefined>();
+  const [peers, setPeers] = useState<number>(0);
 
   const startClient = useCallback(
     async () => {
@@ -45,8 +49,20 @@ export const App = () => {
         const libp2p = await createLibp2p(options);
 
         libp2p.addEventListener('peer:discovery', async ({ detail }) => {
-          console.log('Peer:', detail.id.toString());
-          await libp2p.peerStore.addressBook.set(detail.id, detail.multiaddrs);
+          // console.log('Peer:', detail.id.toString());
+          libp2p.dial(detail.id).catch(err => {
+            // console.log(`Could not dial ${detail.id}`, err);
+          });
+        });
+
+        libp2p.connectionManager.addEventListener('peer:connect', async ({ detail }) => {
+          // const id = detail.id.toString();
+          // console.log('Peer connected:', id);
+        });
+
+        libp2p.connectionManager.addEventListener('peer:disconnect', async ({ detail }) => {
+          // const id = detail.id.toString();
+          // console.log('Peer disconnected:', id);
         });
 
         libp2p.pubsub.addEventListener('message', ({ detail }) => {
@@ -76,6 +92,7 @@ export const App = () => {
     if (lib) {
       setInterval(
         () => {
+          setPeers(lib.connectionManager.getConnections().length);
           lib.pubsub.publish(topic, encodeText(`Hello! ${Date.now()}`));
         },
         5000
@@ -95,6 +112,7 @@ export const App = () => {
       {broadcasting && (
         <div>✅ Broadcasting started</div>
       )}
+      <div>✅ Peers {peers}</div>
       {error && (
         <div>🚨 {error}</div>
       )}

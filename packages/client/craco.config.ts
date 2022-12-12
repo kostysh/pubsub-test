@@ -22,9 +22,16 @@ const cracoConfig: CracoConfig = {
         });
       }
 
+      // webpackConfig.resolve = {
+      //   ...webpackConfig.resolve,
+      //   fallback: {
+      //     ...webpackConfig.resolve?.fallback,
+      //   }
+      // };
+
       return webpackConfig;
     }
-  }
+  },
 };
 
 export default cracoConfig;
