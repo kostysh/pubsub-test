@@ -1,6 +1,6 @@
 # Testing of `libp2p` pub/sub features
 
-These packages are demonstrate pub/sub between nodes in browser and standalone (node.js) via centralized standalone node (node.js).
+These packages are demonstrate pub/sub between nodes in browser and standalone (node.js) via centralized standalone node (node.js) over websockets transport.
 
 ## Packages
 
