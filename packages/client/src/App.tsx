@@ -3,9 +3,9 @@ import { createLibp2p, Libp2pOptions, Libp2p } from 'libp2p';
 import { noise } from '@chainsafe/libp2p-noise';
 import { mplex } from '@libp2p/mplex';
 import { gossipsub } from '@chainsafe/libp2p-gossipsub';
-import wrtc from 'wrtc';
-import { webRTCStar } from '@libp2p/webrtc-star';
 import { webSockets } from '@libp2p/websockets';
+import { all } from '@libp2p/websockets/filters';
+import { bootstrap } from '@libp2p/bootstrap';
 
 export const encodeText = (test: string) =>
   new TextEncoder().encode(test);
@@ -13,31 +13,26 @@ export const encodeText = (test: string) =>
 export const decodeText = (buffer: BufferSource) =>
   new TextDecoder().decode(buffer);
 
-export const topic = 'wt_test_pubsub/v1';
-
-export const webRtc = webRTCStar({ wrtc });
-
 export const options: Libp2pOptions = {
-  addresses: {
-    listen: [
-      '/dns4/wrtc-star1.par.dwebops.pub/tcp/443/wss/p2p-webrtc-star',
-      '/dns4/wrtc-star2.sjc.dwebops.pub/tcp/443/wss/p2p-webrtc-star',
-    ]
-  },
-  transports: [webRtc.transport, webSockets()],
+  transports: [webSockets({
+    filter: all
+  })],
   streamMuxers: [mplex()],
   connectionEncryption: [noise()],
-  peerDiscovery: [
-    webRtc.discovery,
-  ],
   pubsub: gossipsub({
     allowPublishToZeroPeers: true,
   }),
+  peerDiscovery: [
+    bootstrap({
+      list: [
+        '/ip4/127.0.0.1/tcp/34421/ws/p2p/QmcXbDrzUU5ERqRaronWmAJXwe6c7AEkS7qdcsjgEuWPCf'
+      ]
+    }),
+  ],
 };
 
 export const App = () => {
   const [error, setError] = useState<string | undefined>();
-  const [subscribed, setSubscribed] = useState<boolean>(false);
   const [broadcasting, setBroadcasting] = useState<boolean>(false);
   const [lib, setLib] = useState<Libp2p | undefined>();
   const [peers, setPeers] = useState<number>(0);
@@ -49,20 +44,22 @@ export const App = () => {
         const libp2p = await createLibp2p(options);
 
         libp2p.addEventListener('peer:discovery', async ({ detail }) => {
-          // console.log('Peer:', detail.id.toString());
-          libp2p.dial(detail.id).catch(err => {
-            // console.log(`Could not dial ${detail.id}`, err);
-          });
+          const id = detail.id.toString();
+          console.log('Peer discovery:', id);
+
+          // libp2p.dial(detail.multiaddrs[0]).catch(err => {
+          //   console.log(`Could not dial ${detail.id}`, err);
+          // });
+        })
+
+        libp2p.addEventListener('peer:connect', async ({ detail }) => {
+          const id = detail.id.toString();
+          console.log('Peer connected:', id);
         });
 
-        libp2p.connectionManager.addEventListener('peer:connect', async ({ detail }) => {
-          // const id = detail.id.toString();
-          // console.log('Peer connected:', id);
-        });
-
-        libp2p.connectionManager.addEventListener('peer:disconnect', async ({ detail }) => {
-          // const id = detail.id.toString();
-          // console.log('Peer disconnected:', id);
+        libp2p.addEventListener('peer:disconnect', async ({ detail }) => {
+          const id = detail.id.toString();
+          console.log('Peer disconnected:', id);
         });
 
         libp2p.pubsub.addEventListener('message', ({ detail }) => {
@@ -71,8 +68,7 @@ export const App = () => {
           );
         });
 
-        libp2p.pubsub.subscribe(topic);
-        setSubscribed(true);
+        libp2p.pubsub.subscribe('request');
 
         await libp2p.start();
         setLib(libp2p);
@@ -91,9 +87,14 @@ export const App = () => {
   useEffect(() => {
     if (lib) {
       setInterval(
-        () => {
-          setPeers(lib.connectionManager.getConnections().length);
-          lib.pubsub.publish(topic, encodeText(`Hello! ${Date.now()}`));
+        async () => {
+          try {
+            setPeers(lib.getConnections().length);
+            await lib.pubsub.publish('request', encodeText(`Dude!!! ${Date.now()}`));
+          } catch (error) {
+            console.log(error);
+          }
+
         },
         5000
       );
@@ -105,9 +106,6 @@ export const App = () => {
     <>
       {lib !== undefined && (
         <div>✅ Client started</div>
-      )}
-      {subscribed && (
-        <div>✅ Subscribed to {topic} topic</div>
       )}
       {broadcasting && (
         <div>✅ Broadcasting started</div>
